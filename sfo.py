@@ -13,6 +13,12 @@ import scipy.linalg
 import time
 import warnings
 
+import theano
+from theano import tensor
+A = tensor.fmatrix()
+B = tensor.fmatrix()
+dot = theano.function([A, B], tensor.dot(A, B), allow_input_downcast=True)
+
 class SFO(object):
     def __init__(self, f_df, theta, subfunction_references, args=(), kwargs={},
         display=2, max_history_terms=10, hessian_init=1e5, init_subf=2,
@@ -101,7 +107,7 @@ class SFO(object):
         self.K_max = ceil(self.K_min*1.5)
         self.K_max = int(min([self.K_max, self.M]))
         # self.P holds the subspace
-        self.P = zeros((self.M,self.K_max))
+        self.P = zeros((self.M,self.K_max), dtype='float32')
 
         # store the minimum and maximum eigenvalue from each approximate
         # Hessian
@@ -1007,7 +1013,9 @@ class SFO(object):
             full_df += Hdtheta + self.last_df[:,[i]]
         full_H_combined = self.get_full_H_with_diagonal()
         # TODO - Use Woodbury identity instead of recalculating full inverse
-        full_H_inv = linalg.inv(full_H_combined)
+        # full_H_inv = linalg.inv(full_H_combined)
+        L, Q = linalg.eigh(full_H_combined)
+        full_H_inv = (Q / abs(L)).dot(Q.T)
 
         # calculate an update step
         dtheta_proj = -dot(full_H_inv, full_df) * self.step_scale
